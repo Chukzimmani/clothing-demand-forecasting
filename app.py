@@ -35,7 +35,9 @@ future_exog = pd.DataFrame({
 })
 
 # Generate future index starting from today
-future_index = pd.date_range(start=datetime.today(), periods=forecast_days, freq='D')
+from datetime import date
+today = pd.to_datetime(date.today())  # uses your actual system date
+future_index = pd.date_range(start=today, periods=forecast_days, freq='D')
 future_exog.index = future_index
 
 # Forecast using SARIMAX
