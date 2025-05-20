@@ -1,13 +1,12 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
-from datetime import datetime
+from datetime import datetime, timedelta
 
 st.title("Clothing Demand Forecasting App")
-st.write("This app uses a pre-trained SARIMAX model to forecast clothing demand based on discount, price, and competitor pricing.")
+st.write("This version lets you manually input expected values for Discount, Price, and Competitor Pricing to forecast future demand.")
 
 # Load model
 @st.cache_resource
@@ -16,55 +15,44 @@ def load_model():
         model = pickle.load(file)
     return model
 
-# Load exogenous data
-@st.cache_data
-def load_data():
-    df = pd.read_csv("retail_store_inventory_preprocessed.csv", parse_dates=["Date"])
-    df = df[df["Category"] == 3]
-    df.set_index("Date", inplace=True)
-    df.sort_index(inplace=True)
-    grouped = df.groupby(df.index).agg({
-        "Units Sold": "sum",
-        "Discount": "mean",
-        "Price": "mean",
-        "Competitor Pricing": "mean"
-    })
-    return grouped
-
 model = load_model()
-data = load_data()
 
-# Date input for forecasting
-st.sidebar.header("Forecast Controls")
-start_date = st.sidebar.date_input("Start Date", value=data.index[-30].date())
-forecast_horizon = st.sidebar.slider("Forecast Horizon (days)", min_value=7, max_value=30, value=14)
+# Forecast Settings
+st.sidebar.header("Forecast Settings")
+forecast_days = st.sidebar.slider("Forecast Horizon (days)", min_value=7, max_value=30, value=14)
 
-# Subset exogenous variables for prediction
-exog = data[["Discount", "Price", "Competitor Pricing"]]
-y = data["Units Sold"]
+# User inputs for exogenous variables
+st.sidebar.header("Expected Future Values")
+discount = st.sidebar.number_input("Expected Discount (%)", min_value=0, max_value=100, value=10)
+price = st.sidebar.number_input("Expected Price", min_value=0.0, value=50.0)
+competitor_price = st.sidebar.number_input("Expected Competitor Price", min_value=0.0, value=55.0)
 
-# Validate range
-if pd.Timestamp(start_date) not in data.index.normalize():
-    st.warning("Selected start date is not in the dataset.")
-else:
-    start_idx = data.index.get_loc(pd.to_datetime(start_date))
-    if start_idx + forecast_horizon > len(data):
-        st.warning("Forecast horizon exceeds available data.")
-    else:
-        exog_future = exog.iloc[start_idx:start_idx+forecast_horizon]
-        forecast = model.get_forecast(steps=forecast_horizon, exog=exog_future)
-        pred_mean = forecast.predicted_mean
-        conf_int = forecast.conf_int()
+# Create synthetic future exogenous dataframe
+future_exog = pd.DataFrame({
+    "Discount": [discount] * forecast_days,
+    "Price": [price] * forecast_days,
+    "Competitor Pricing": [competitor_price] * forecast_days
+})
 
-        # Plot
-        st.subheader("Forecast Results")
-        fig, ax = plt.subplots(figsize=(10, 5))
-        ax.plot(y.index, y, label="Historical Sales")
-        ax.plot(pred_mean.index, pred_mean, label="Forecast", color="green")
-        ax.fill_between(pred_mean.index, conf_int.iloc[:, 0], conf_int.iloc[:, 1], color="lightgreen", alpha=0.3)
-        ax.set_title("Forecasted Clothing Demand")
-        ax.legend()
-        ax.grid(True)
-        st.pyplot(fig)
+# Generate future index starting from today
+future_index = pd.date_range(start=datetime.today(), periods=forecast_days, freq='D')
+future_exog.index = future_index
 
-        st.success("Forecast completed successfully.")
+# Forecast using SARIMAX
+forecast = model.get_forecast(steps=forecast_days, exog=future_exog)
+pred_mean = forecast.predicted_mean
+conf_int = forecast.conf_int()
+
+# Plotting
+st.subheader("Forecast Results")
+fig, ax = plt.subplots(figsize=(10, 5))
+ax.plot(pred_mean.index, pred_mean, label="Forecast", color="green")
+ax.fill_between(pred_mean.index, conf_int.iloc[:, 0], conf_int.iloc[:, 1], color="lightgreen", alpha=0.3)
+ax.set_title("Future Forecast of Clothing Demand")
+ax.set_xlabel("Date")
+ax.set_ylabel("Units Sold")
+ax.grid(True)
+ax.legend()
+st.pyplot(fig)
+
+st.success("Forecast completed successfully.")
