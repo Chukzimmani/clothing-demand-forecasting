@@ -44,7 +44,7 @@ exog = data[["Discount", "Price", "Competitor Pricing"]]
 y = data["Units Sold"]
 
 # Validate range
-if start_date not in data.index:
+if pd.Timestamp(start_date) not in data.index.normalize():
     st.warning("Selected start date is not in the dataset.")
 else:
     start_idx = data.index.get_loc(pd.to_datetime(start_date))
