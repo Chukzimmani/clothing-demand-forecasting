@@ -3,10 +3,10 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import pickle
-from datetime import datetime, timedelta
+from datetime import date
 
 st.title("Clothing Demand Forecasting App")
-st.write("This version lets you manually input expected values for Discount, Price, and Competitor Pricing to forecast future demand.")
+st.write("This version lets you manually input expected values and select a forecast start date to simulate future demand.")
 
 # Load model
 @st.cache_resource
@@ -20,6 +20,7 @@ model = load_model()
 # Forecast Settings
 st.sidebar.header("Forecast Settings")
 forecast_days = st.sidebar.slider("Forecast Horizon (days)", min_value=7, max_value=30, value=14)
+start_date = st.sidebar.date_input("Forecast Start Date", value=date.today())
 
 # User inputs for exogenous variables
 st.sidebar.header("Expected Future Values")
@@ -27,17 +28,15 @@ discount = st.sidebar.number_input("Expected Discount (%)", min_value=0, max_val
 price = st.sidebar.number_input("Expected Price", min_value=0.0, value=50.0)
 competitor_price = st.sidebar.number_input("Expected Competitor Price", min_value=0.0, value=55.0)
 
-# Create synthetic future exogenous dataframe
+# Create synthetic exogenous dataframe
 future_exog = pd.DataFrame({
     "Discount": [discount] * forecast_days,
     "Price": [price] * forecast_days,
     "Competitor Pricing": [competitor_price] * forecast_days
 })
 
-# Generate future index starting from today
-from datetime import date
-today = pd.to_datetime(date.today())  # uses your actual system date
-future_index = pd.date_range(start=today, periods=forecast_days, freq='D')
+# Set forecast date index based on user input
+future_index = pd.date_range(start=pd.to_datetime(start_date), periods=forecast_days, freq='D')
 future_exog.index = future_index
 
 # Forecast using SARIMAX
