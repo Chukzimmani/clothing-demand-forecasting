@@ -44,6 +44,10 @@ forecast = model.get_forecast(steps=forecast_days, exog=future_exog)
 pred_mean = forecast.predicted_mean
 conf_int = forecast.conf_int()
 
+pred_mean.index = future_index
+conf_int.index = future_index
+
+
 # Plotting
 st.subheader("Forecast Results")
 fig, ax = plt.subplots(figsize=(10, 5))
